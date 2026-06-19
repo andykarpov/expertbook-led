@@ -10,7 +10,7 @@ $(TARGET): main.cpp
 
 install: $(TARGET)
 	install -m 755 $(TARGET) /usr/local/bin/
-	@echo 'KERNEL=="hidraw*", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="0124", MODE="0666"' > /etc/udev/rules.d/99-asus-alexa-bar.rules
+	@echo 'SUBSYSTEM=="hidraw", KERNELS=="0018:0B05:0124.*", MODE="0666"' > /etc/udev/rules.d/99-asus-alexa-bar.rules
 	@udevadm control --reload-rules && udevadm trigger
 	@echo "Installation complete. Executable placed in /usr/local/bin/. Udev rules deployed."
 
