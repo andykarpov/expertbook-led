@@ -11,13 +11,12 @@ const size_t REPORT_SIZE = 33;
 void print_usage() {
     std::cout << "Usage: expertbook-led [options]\n"
               << "Options:\n"
-              << "  --effect [1-20]        Play built-in animation effect\n"
-              << "  --static [R] [G] [B]   Set solid color for all LEDs (0-255)\n"
-              << "  --brightness [1-100]   Set global maximum brightness percentage\n"
-              << "  --repeat [1-255]       Set global animation repeat count\n"
-              << "  --infinite             Enable infinite animation loop\n"
-              << "  --cmd-mode             Force reset controller back to command mode\n"
-              << "  --off                  Turn off the LED bar (simulated via matrix zeroing)\n";
+              << "  --effect [1-20]        Play built-in hardware animation effect\n"
+              << "  --brightness [1-32]    Set global PWM brightness level (1-32 steps)\n"
+              << "  --repeat [1-255]       Set global animation repeat loop count\n"
+              << "  --infinite             Enable endless animation playback loop\n"
+              << "  --freeze               Freeze/Pause the animation layout at current frame\n"
+              << "  --unfreeze             Unfreeze the animation and restore command state\n";
 }
 
 bool send_feature_report(const std::vector<unsigned char>& data) {
@@ -52,30 +51,18 @@ int main(int argc, char* argv[]) {
     }
 
     std::string arg = argv[1];
-    std::vector<unsigned char> report_data = {32}; // Report ID is always 32 (0x20)
+    std::vector<unsigned char> report_data = {32}; // Report ID: 0x20
 
     if (arg == "--effect" && argc == 3) {
         int effect = std::stoi(argv[2]);
         if (effect < 1 || effect > 20) { std::cerr << "Invalid effect number (1-20)\n"; return 1; }
         
-        // Force exit from Direct Drive mode to Command mode first
+        // Always unfreeze state machine before pushing a new effect
         send_feature_report({32, 6, 2});
         
         report_data.push_back(1); 
         report_data.push_back(effect);
     } 
-    else if (arg == "--static" && argc == 5) {
-        int r = std::stoi(argv[2]);
-        int g = std::stoi(argv[3]);
-        int b = std::stoi(argv[4]);
-        
-        report_data.push_back(6); // Direct Drive mode
-        for (int i = 0; i < 8; ++i) { // Pack GRB/RGB values for all 8 LEDs
-            report_data.push_back(r);
-            report_data.push_back(g);
-            report_data.push_back(b);
-        }
-    }
     else if (arg == "--infinite") {
         report_data.push_back(2);
         report_data.push_back(2);
@@ -88,18 +75,17 @@ int main(int argc, char* argv[]) {
     } 
     else if (arg == "--brightness" && argc == 3) {
         int b = std::stoi(argv[2]);
-        if (b < 1 || b > 100) { std::cerr << "Brightness must be 1-100\n"; return 1; }
-        int raw_brightness = (b * 255) / 100; 
+        if (b < 1 || b > 32) { std::cerr << "Brightness must be 1-32\n"; return 1; }
         report_data.push_back(4);
-        report_data.push_back(raw_brightness);
+        report_data.push_back(b);
     } 
-    else if (arg == "--cmd-mode") {
+    else if (arg == "--freeze") {
         report_data.push_back(6);
-        report_data.push_back(2);
+        report_data.push_back(0); // Trigger latch freeze frame
     }
-    else if (arg == "--off") {
-        report_data.push_back(6); // Zero out all matrix channels to turn off safely
-        for (size_t i = 0; i < 31; ++i) report_data.push_back(0);
+    else if (arg == "--unfreeze") {
+        report_data.push_back(6);
+        report_data.push_back(2); // Recover execution
     } 
     else {
         print_usage();
@@ -107,11 +93,12 @@ int main(int argc, char* argv[]) {
     }
 
     if (send_feature_report(report_data)) {
-        std::cout << "Command successfully sent to ITE controller.\n";
+        std::cout << "Command accepted by ITE controller.\n";
     } else {
-        std::cerr << "Failed to send command.\n";
+        std::cerr << "Hardware transmission failed.\n";
         return 1;
     }
 
     return 0;
 }
+

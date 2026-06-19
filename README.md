@@ -1,85 +1,82 @@
 # ASUS ExpertBook B9450 LED Bar Control (`expertbook-led`)
 
-A lightweight, native C++ utility to control the proprietary front panel LED strip (historically known as the *Alexa Light Bar*) on the **ASUS ExpertBook B9450** laptop under Linux. 
+A lightweight, native C++ utility to control the proprietary front panel LED strip (historically known as the *Alexa Light Bar*) on the **ASUS ExpertBook B9450** laptop running Linux. 
 
-This project interacts directly with the embedded **ITE IT8232FN** micro-controller via native `HID-over-I2C` kernel interface (`/dev/hidraw`), avoiding bloated scripts, daemons, or Python wrappers.
+This project interacts directly with the embedded **ITE IT8232FN** micro-controller using the native `HID-over-I2C` kernel subsystem (`/dev/hidraw`), providing a fast, zero-dependency solution without bloated background daemons.
 
 ## Features
-- Trigger 20 built-in hardware animation effects.
-- Set custom static RGB colors across the entire bar.
-- Control global maximum brightness.
-- Adjust animation loop counts or enable infinite loops.
-- Lock/unlock between Direct Matrix Drive and Command modes seamlessly.
-- Includes automated hardware permission setup (run without `sudo`).
+- Trigger 20 built-in hardware animation presets.
+- Control global maximum brightness via a 32-step hardware PWM scale.
+- Adjust animation loop counts or unlock endless loops.
+- Freeze/Pause current animation frame and safely unfreeze the chip's internal state machine.
+- Integrated `udev` setup allowing secure execution from standard non-root user space.
 
 ## Prerequisites
-You need a modern Linux kernel (5.15+) and the `hidapi` development library.
+Ensure you have a modern Linux kernel and the `hidapi` compilation libraries.
 
-On Debian/Ubuntu based distributions:
+On Debian/Ubuntu based systems:
 ```bash
 sudo apt install libhidapi-dev g++ make
 ```
 
 ## Installation
 
-1. Clone the repository and compile the binary:
+1. Build the binary from source:
    ```bash
    make
    ```
-2. System-wide installation (places the executable into `/usr/local/bin` and deploys necessary `udev` rules for sudo-free access):
+2. System-wide installation (installs the binary to `/usr/local/bin` and automatically configures safe `udev` hardware permissions):
    ```bash
    sudo make install
    ```
 
 ## Usage Examples
 
-Once installed, you can trigger the LED bar from terminal, cronjobs, or systemd hooks:
+Once installed, the utility can be seamlessly integrated into user shell environments, event hooks, or cron timers:
 
-* **Play an animation effect (e.g., effect #5):**
+* **Play a specific built-in hardware animation (e.g., effect #5):**
   ```bash
   expertbook-led --effect 5
   ```
-* **Set solid customized color (e.g., Cyan for battery full):**
+* **Dim the bar's maximum intensity down to night-friendly level (values 1 to 32):**
   ```bash
-  expertbook-led --static 0 255 255
+  expertbook-led --brightness 8
   ```
-* **Dim the maximum brightness to 20% (useful at night):**
+* **Set animations to loop exactly 3 times globally, then play effect #12:**
   ```bash
-  expertbook-led --brightness 20
-  ```
-* **Configure animations to repeat 5 times globally, then trigger effect #12:**
-  ```bash
-  expertbook-led --repeat 5
+  expertbook-led --repeat 3
   expertbook-led --effect 12
   ```
-* **Enable endless animation loops:**
+* **Allow hardware effects to run endlessly:**
   ```bash
   expertbook-led --infinite
   ```
-* **Turn off the LED bar completely:**
+* **Freeze the current layout configuration / Pause the animation frame:**
   ```bash
-  expertbook-led --off
+  expertbook-led --freeze
+  ```
+* **Unfreeze and restore the micro-controller back to command listening state:**
+  ```bash
+  expertbook-led --unfreeze
   ```
 
 ---
 
-## Technical Protocol Documentation
+## Technical Protocol Mapping
 
-The tool crafts specific 33-byte `HID Feature Reports` targeting **VID: `0x0B05` / PID: `0x0124`** on Report ID `32` (`0x20`).
+All operations construct targeted 33-byte `HID Feature Reports` aiming at **VID: `0x0B05` / PID: `0x0124`** using Report ID `32` (`0x20`).
 
-### Protocol Mapping (Feature Report 32)
-
-| Byte 0 (Report ID) | Byte 1 (Sub-Command) | Byte 2 (Parameter) | Remaining Bytes (3-32) | Description |
+| Byte 0 (Report ID) | Byte 1 (Sub-Command) | Byte 2 (Parameter) | Remaining Bytes (3-32) | Functional Description |
 |---|---|---|---|---|
-| `32` | `1` | `1-20` | `0...` | Plays a factory hardcoded animation pre-set. |
-| `32` | `2` | `2` | `0...` | Sets animation playback loop to infinite. |
-| `32` | `3` | `1-255` | `0...` | Saves animation loop limit state in chip memory. |
-| `32` | `4` | `0-255` | `0...` | Sets global LED brightness attenuation. |
-| `32` | `6` | `2` | `0...` | **Command Mode Reset:** Releases the state machine back to effect listening state. |
-| `32` | `6` | `R` | `G, B, R, G, B...` | **Direct Drive Mode:** Feeds raw streaming matrix arrays to individual LED diodes. |
+| `32` | `1` | `1-20` | `0...` | Fires an internal hardware animation routine. |
+| `32` | `2` | `2` | `0...` | Modifies playback cycle loop state to infinity. |
+| `32` | `3` | `1-255` | `0...` | Saves discrete animation loop counts to controller registers. |
+| `32` | `4` | `1-32` | `0...` | Compresses hardware LED brightness matrix (5-bit PWM). |
+| `32` | `6` | `0` | `0...` | **Freeze State:** Latches and pauses the current lighting frame. |
+| `32` | `6` | `2` | `0...` | **State Reset:** Recovers the state machine back to standard operational readiness. |
 
-*Note: Entering Direct Drive Mode locks the chip's internal state machine. Calling `--effect` safely triggers a `32, 6, 2` packet first to properly restore execution.*
+*Implementation Note: Executing an animation through `--effect` automatically sends an unfreeze (`32, 6, 2`) frame first to prevent hardware lockups from previous pause states.*
 
 ## License
-MIT License. Feel free to use, modify, and distribute.
+MIT License. Feel free to copy, modify, and integrate.
 
