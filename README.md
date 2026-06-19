@@ -60,6 +60,65 @@ Once installed, the utility can be seamlessly integrated into user shell environ
   expertbook-led --unfreeze
   ```
 
+## Desktop Notifications Integration (D-Bus Bridge)
+
+You can turn the Alexa Light Bar into a physical notification center for your Linux desktop environment (GNOME, KDE, XFCE, etc.). By intercepting the `org.freedesktop.Notifications` interface via D-Bus, the LED bar can flash whenever a system app, messenger (Telegram, Slack), or browser triggers a popup notification.
+
+### 1. Notification Listener Script
+Create a script named `expertbook-notifier.sh`:
+
+```bash
+#!/bin/bash
+LED_UTIL="/usr/local/bin/expertbook-led"
+
+stdbuf -oL dbus-monitor "interface='org.freedesktop.Notifications',member='Notify'" | while read -r line; do
+    if echo "\$line" | grep -q "member=Notify"; then
+        URGENCY=1
+        PARAM_BLOCK=\$(timeout 0.05 cat)
+        
+        if echo "\$PARAM_BLOCK" | grep -A1 '"urgency"' | grep -q "byte 2"; then
+            URGENCY=2 # Critical
+        elif echo "\$PARAM_BLOCK" | grep -A1 '"urgency"' | grep -q "byte 0"; then
+            URGENCY=0 # Low
+        fi
+
+        case "\$URGENCY" in
+            2) \$LED_UTIL --effect 8 ;; # Critical
+            0) \$LED_UTIL --effect 1  ;; # Low
+            *) \$LED_UTIL --effect 5  ;; # Normal
+        esac
+    fi
+done
+```
+Make it executable: `chmod +x expertbook-notifier.sh`
+
+### 2. Auto-start on Login (Systemd User Service)
+To run this listener automatically in the background when your graphical desktop session loads, configure it as a systemd user service.
+
+Create the service file inside your user directory at `~/.config/systemd/user/expertbook-notifier.service`:
+
+```ini
+[Unit]
+Description=ASUS ExpertBook LED Notification Bridge
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/home/YOUR_USERNAME/.local/bin/expertbook-notifier.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+```
+*(Make sure to change `YOUR_USERNAME` and the file path to point to your exact script location).*
+
+Enable and start the service (no root/sudo privileges required):
+```bash
+systemctl --user enable --now expertbook-notifier.service
+```
+Now, your front panel hardware LED bar will subtly pulse whenever your system delivers any desktop event!
+
 ---
 
 ## Technical Protocol Mapping
