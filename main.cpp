@@ -14,9 +14,7 @@ void print_usage() {
               << "  --effect [1-20]        Play built-in hardware animation effect\n"
               << "  --brightness [1-32]    Set global PWM brightness level (1-32 steps)\n"
               << "  --repeat [1-255]       Set global animation repeat loop count\n"
-              << "  --infinite             Enable endless animation playback loop\n"
-              << "  --freeze               Freeze/Pause the animation layout at current frame\n"
-              << "  --unfreeze             Unfreeze the animation and restore command state\n";
+              << "  --infinite             Enable endless animation playback loop\n";
 }
 
 bool send_feature_report(const std::vector<unsigned char>& data) {
@@ -57,9 +55,6 @@ int main(int argc, char* argv[]) {
         int effect = std::stoi(argv[2]);
         if (effect < 1 || effect > 20) { std::cerr << "Invalid effect number (1-20)\n"; return 1; }
         
-        // Always unfreeze state machine before pushing a new effect
-        send_feature_report({32, 6, 2});
-        
         report_data.push_back(1); 
         report_data.push_back(effect);
     } 
@@ -78,14 +73,6 @@ int main(int argc, char* argv[]) {
         if (b < 1 || b > 32) { std::cerr << "Brightness must be 1-32\n"; return 1; }
         report_data.push_back(4);
         report_data.push_back(b);
-    } 
-    else if (arg == "--freeze") {
-        report_data.push_back(6);
-        report_data.push_back(0); // Trigger latch freeze frame
-    }
-    else if (arg == "--unfreeze") {
-        report_data.push_back(6);
-        report_data.push_back(2); // Recover execution
     } 
     else {
         print_usage();

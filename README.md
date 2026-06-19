@@ -8,7 +8,6 @@ This project interacts directly with the embedded **ITE IT8232FN** micro-control
 - Trigger 20 built-in hardware animation presets.
 - Control global maximum brightness via a 32-step hardware PWM scale.
 - Adjust animation loop counts or unlock endless loops.
-- Freeze/Pause current animation frame and safely unfreeze the chip's internal state machine.
 - Integrated `udev` setup allowing secure execution from standard non-root user space.
 
 ## Prerequisites
@@ -50,14 +49,6 @@ Once installed, the utility can be seamlessly integrated into user shell environ
 * **Allow hardware effects to run endlessly:**
   ```bash
   expertbook-led --infinite
-  ```
-* **Freeze the current layout configuration / Pause the animation frame:**
-  ```bash
-  expertbook-led --freeze
-  ```
-* **Unfreeze and restore the micro-controller back to command listening state:**
-  ```bash
-  expertbook-led --unfreeze
   ```
 
 ## Desktop Notifications Integration (D-Bus Bridge)
@@ -131,10 +122,7 @@ All operations construct targeted 33-byte `HID Feature Reports` aiming at **VID:
 | `32` | `2` | `2` | `0...` | Modifies playback cycle loop state to infinity. |
 | `32` | `3` | `1-255` | `0...` | Saves discrete animation loop counts to controller registers. |
 | `32` | `4` | `1-32` | `0...` | Compresses hardware LED brightness matrix (5-bit PWM). |
-| `32` | `6` | `0` | `0...` | **Freeze State:** Latches and pauses the current lighting frame. |
-| `32` | `6` | `2` | `0...` | **State Reset:** Recovers the state machine back to standard operational readiness. |
 
-*Implementation Note: Executing an animation through `--effect` automatically sends an unfreeze (`32, 6, 2`) frame first to prevent hardware lockups from previous pause states.*
 
 ## License
 MIT License. Feel free to copy, modify, and integrate.
